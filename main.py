@@ -317,6 +317,7 @@ class MoveConfirmView(discord.ui.View):
 # =========================
 
 @bot.tree.command(name="接続")
+@app_commands.guilds(discord.Object(id=GUILD_ID))
 async def connect(interaction: discord.Interaction):
 
     if interaction.guild.id != GUILD_ID:
@@ -423,6 +424,7 @@ async def connect(interaction: discord.Interaction):
 # =========================
 
 @bot.tree.command(name="切断")
+@app_commands.guilds(discord.Object(id=GUILD_ID))
 async def disconnect(interaction: discord.Interaction):
 
     if interaction.guild.id != GUILD_ID:
@@ -460,6 +462,7 @@ async def disconnect(interaction: discord.Interaction):
 # =========================
 
 @bot.tree.command(name="話者変更")
+@app_commands.guilds(discord.Object(id=GUILD_ID))
 async def speaker_change(interaction: discord.Interaction):
 
     if interaction.guild.id != GUILD_ID:
