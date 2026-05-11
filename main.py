@@ -6,6 +6,7 @@ import tempfile
 import os
 import re
 import aiohttp
+import traceback
 
 # =========================
 # 設定
@@ -98,6 +99,11 @@ async def generate_tts(
     text: str,
     speaker: int
 ):
+    print(
+        f"[VOICEVOX REQUEST] "
+        f"text={text} "
+        f"speaker={speaker}"
+    )
 
     temp_file = tempfile.NamedTemporaryFile(
         delete=False,
@@ -122,6 +128,11 @@ async def generate_tts(
             }
         ) as r:
 
+            print(
+                f"[VOICEVOX audio_query] "
+                f"status={r.status}"
+            )
+
             query = await r.json()
 
         # synthesis
@@ -133,10 +144,20 @@ async def generate_tts(
             json=query
         ) as r:
 
+            print(
+                f"[VOICEVOX synthesis] "
+                f"status={r.status}"
+            )
+
             audio = await r.read()
 
     with open(path, "wb") as f:
         f.write(audio)
+
+    print(
+        f"[VOICE FILE SAVED] "
+        f"{path}"
+    )
 
     return path
 
@@ -167,6 +188,11 @@ async def process_queue(guild_id: int):
         try:
             text = await queue.get()
 
+            print(
+                f"[QUEUE GET] "
+                f"{text}"
+            )
+
         except asyncio.CancelledError:
             break
 
@@ -189,6 +215,8 @@ async def process_queue(guild_id: int):
                 if error:
                     print("[VOICE PLAY ERROR]", error)
 
+                print("[VOICE PLAY END]")
+
                 try:
                     os.remove(path)
                 except:
@@ -199,6 +227,8 @@ async def process_queue(guild_id: int):
 
             source = discord.FFmpegPCMAudio(path)
 
+            print("[VOICE PLAY START]")
+
             vc.play(source, after=after_play)
 
             await asyncio.wait_for(
@@ -206,9 +236,10 @@ async def process_queue(guild_id: int):
                 timeout=60
             )
 
-        except Exception as e:
+        except Exception:
 
-            print("[VOICE ERROR]", e)
+            print("[VOICE ERROR]")
+            traceback.print_exc()
 
 # =========================
 # 話者変更Select
@@ -388,6 +419,18 @@ async def connect(interaction: discord.Interaction):
 
     try:
 
+        print(
+            f"[CONNECT START] "
+            f"user={interaction.user}"
+        )
+
+        print(
+            f"[CONNECT TARGET VC] "
+            f"{target_channel.name}"
+        )
+
+        print("[VOICE CONNECT BEGIN]")
+
         vc = await asyncio.wait_for(
             target_channel.connect(
                 reconnect=True,
@@ -397,6 +440,14 @@ async def connect(interaction: discord.Interaction):
         )
 
         tts_sessions[guild_id]["voice_client"] = vc
+
+        print("[VOICE CONNECT SUCCESS]")
+
+        print(
+            f"[VOICE CLIENT] "
+            f"is_connected={vc.is_connected()} "
+            f"channel={vc.channel}"
+        )
 
         # warmup
         try:
@@ -419,11 +470,12 @@ async def connect(interaction: discord.Interaction):
             ephemeral=True
         )
 
-    except Exception as e:
+    except Exception:
 
         tts_sessions.pop(guild_id, None)
 
-        print("[VOICE CONNECT ERROR]", e)
+        print("[VOICE CONNECT ERROR]")
+        traceback.print_exc()
 
         await interaction.followup.send(
             f"❌ 接続失敗\n{e}",
@@ -495,6 +547,12 @@ async def on_message(message: discord.Message):
     if message.author.bot:
         return
 
+    print(
+        f"[MESSAGE RECEIVE] "
+        f"user={message.author} "
+        f"text={message.content}"
+    )
+
     if not message.guild:
         return
 
@@ -521,6 +579,11 @@ async def on_message(message: discord.Message):
 
     if not text:
         return
+
+    print(
+        f"[QUEUE PUT] "
+        f"{text}"
+    )
 
     await session["queue"].put(text)
 
