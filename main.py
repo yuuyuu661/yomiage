@@ -13,7 +13,7 @@ import aiohttp
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-GUILD_ID = 1420918259187712093
+GUILD_ID = 1310885590094450739
 
 # Railway internal URL 推奨
 VOICEVOX_URL = "http://voicevox_engine.railway.internal:50021"
