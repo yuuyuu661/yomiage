@@ -430,13 +430,14 @@ async def connect(interaction: discord.Interaction):
         )
 
         print("[VOICE CONNECT BEGIN]")
+        await asyncio.sleep(2)
 
         vc = await asyncio.wait_for(
             target_channel.connect(
                 reconnect=False,
-                self_deaf=True,
-                timeout=30.0
-            ),
+                timeout=60,
+                self_deaf=True
+            )
             timeout=40
         )
 
