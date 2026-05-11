@@ -1,11 +1,5 @@
-discord.py==2.3.2
-python-dotenv
-asyncpg
-pillow
-imageio
-fastapi
-uvicorn
-pykakasi
-gTTS
+discord.py[voice]==2.3.2
+aiohttp
 PyNaCl
+python-dotenv
 ffmpeg-python
