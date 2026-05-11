@@ -16,7 +16,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = 1420918259187712093
 
 # Railway internal URL 推奨
-VOICEVOX_URL = "http://voicevoxengine.railway.internal:50021"
+VOICEVOX_URL = "http://voicevox_engine.railway.internal:50021"
 
 MAX_READ_TEXT = 200
 
