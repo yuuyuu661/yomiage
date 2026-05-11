@@ -1,659 +1,437 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
-import asyncio
-import tempfile
 import os
-import re
+import json
+import asyncio
+import socket as _socket
 import aiohttp
-import traceback
+import discord
+from discord import app_commands
+from discord.ext import commands
 
-# =========================
-# 設定
-# =========================
+# ====== 環境変数 ======
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+# 公開URL: https://<engine>.up.railway.app（ポートなし/https）
+# Private:  http://voicevox_engine.railway.internal:50021（※IPv6-only環境は不可）
+VOICEVOX_URL = os.getenv("VOICEVOX_URL", "https://example.up.railway.app")
 
-TOKEN = os.getenv("DISCORD_TOKEN")
+# デフォルト話者・スタイル（Variablesで上書き可）
+DEFAULT_SPEAKER_NAME = os.getenv("VV_SPEAKER_NAME", "春日部つむぎ")
+DEFAULT_STYLE_NAME   = os.getenv("VV_STYLE_NAME", "ノーマル")
 
-GUILD_ID = 1310885590094450739
+# しゃきぴよ風プリセット（/vv reset 用）
+SHAKIPIYO_PARAMS = dict(
+    speedScale=1.15,
+    pitchScale=0.60,
+    intonationScale=1.20,
+    volumeScale=1.0,
+    prePhonemeLength=0.1,
+    postPhonemeLength=0.1,
+)
 
-# Railway internal URL 推奨
-VOICEVOX_URL = "http://voicevox_engine.railway.internal:50021"
+# 起動時の通常値（素の声）
+DEFAULT_PARAMS = dict(
+    speedScale=1.0,
+    pitchScale=0.0,
+    intonationScale=1.0,
+    volumeScale=1.0,
+    prePhonemeLength=0.1,
+    postPhonemeLength=0.1,
+)
 
-MAX_READ_TEXT = 200
+# 即時同期ギルド（カンマ区切り、未設定ならグローバル同期）
+GUILD_IDS = [int(x.strip()) for x in os.getenv("GUILD_IDS", "").split(",") if x.strip().isdigit()]
 
+# ====== Bot 準備 ======
 intents = discord.Intents.default()
-intents.guilds = True
-intents.voice_states = True
 intents.message_content = True
-intents.messages = True
+intents.voice_states = True  # 切断検知に必要
+bot = commands.Bot(command_prefix="!", intents=intents)
+tree = bot.tree
 
-bot = commands.Bot(
-    command_prefix="!",
-    intents=intents
-)
+# ====== 再生・接続状態 ======
+voice_queues: dict[int, asyncio.Queue[bytes]] = {}
+player_tasks: dict[int, asyncio.Task] = {}
+guild_connect_locks: dict[int, asyncio.Lock] = {}
+disconnect_cleanup_tasks: dict[int, asyncio.Task] = {}
 
-# =========================
-# 正規表現
-# =========================
+# 現在のTTS設定
+current_params = DEFAULT_PARAMS.copy()
+current_speaker_name = DEFAULT_SPEAKER_NAME
+current_style_name   = DEFAULT_STYLE_NAME
 
-URL_PATTERN = re.compile(r"https?://\S+")
-MENTION_PATTERN = re.compile(r"<@!?(\d+)>")
-EMOJI_PATTERN = re.compile(r"<a?:\w+:\d+>")
-CUSTOM_EMOJI_PATTERN = re.compile(r":[^:\s]+:")
-UNICODE_EMOJI_PATTERN = re.compile(
-    "["
-    "\U0001F300-\U0001FAFF"
-    "\U00002700-\U000027BF"
-    "]+",
-    flags=re.UNICODE
-)
 
-# =========================
-# セッション
-# =========================
-
-tts_sessions = {}
-
-user_cooldowns = {}
-
-# =========================
-# 話者一覧
-# =========================
-
-VOICE_SPEAKERS = {
-    "ずんだもん": 3,
-    "四国めたん": 2,
-    "春日部つむぎ": 8,
-}
-
-# =========================
-# テキスト整形
-# =========================
-
-def sanitize_text(text: str):
-
-    text = URL_PATTERN.sub("URL省略", text)
-
-    text = MENTION_PATTERN.sub("メンション", text)
-
-    text = EMOJI_PATTERN.sub("", text)
-
-    text = CUSTOM_EMOJI_PATTERN.sub("", text)
-
-    text = UNICODE_EMOJI_PATTERN.sub("", text)
-
-    text = text.replace("\n", " ")
-
-    text = text.strip()
-
-    if len(text) > MAX_READ_TEXT:
-        text = text[:MAX_READ_TEXT] + "、以下略"
-
-    return text
-
-# =========================
-# VOICEVOX生成
-# =========================
-
-async def generate_tts(
-    text: str,
-    speaker: int
-):
-    print(
-        f"[VOICEVOX REQUEST] "
-        f"text={text} "
-        f"speaker={speaker}"
+# ========= IPv4固定セッション =========
+def _make_session() -> aiohttp.ClientSession:
+    return aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(family=_socket.AF_INET)
     )
 
-    temp_file = tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".wav"
-    )
 
-    path = temp_file.name
-    temp_file.close()
+# ========= VOICEVOX Utility =========
+async def resolve_speaker(session: aiohttp.ClientSession, name: str, style: str) -> int:
+    async with session.get(f"{VOICEVOX_URL}/speakers") as r:
+        r.raise_for_status()
+        speakers = await r.json()
+    for sp in speakers:
+        if sp.get("name") == name:
+            for st in sp.get("styles", []):
+                if st.get("name") == style:
+                    return st.get("id")
+    return speakers[0]["styles"][0]["id"]  # fallback
 
-    timeout = aiohttp.ClientTimeout(total=60)
+async def synth_voicevox(text: str) -> bytes:
+    async with _make_session() as session:
+        spk_id = await resolve_speaker(session, current_speaker_name, current_style_name)
 
-    async with aiohttp.ClientSession(
-        timeout=timeout
-    ) as session:
-
-        # audio_query
+        # audio_query：まず公式仕様（POST + クエリ param）
         async with session.post(
             f"{VOICEVOX_URL}/audio_query",
-            params={
-                "text": text,
-                "speaker": speaker
-            }
+            params={"text": text, "speaker": spk_id},
         ) as r:
+            if r.status == 200:
+                query = await r.json()
+            else:
+                body = await r.text()
+                # フォールバック：JSONボディ（405/415/422）
+                if r.status in (405, 415, 422):
+                    async with session.post(
+                        f"{VOICEVOX_URL}/audio_query",
+                        params={"speaker": spk_id},
+                        json={"text": text},
+                        headers={"Accept": "application/json"},
+                    ) as r2:
+                        if r2.status != 200:
+                            body2 = await r2.text()
+                            raise RuntimeError(f"audio_query {r.status}/{r2.status}: {body} // {body2}")
+                        query = await r2.json()
+                else:
+                    raise RuntimeError(f"audio_query {r.status}: {body}")
 
-            print(
-                f"[VOICEVOX audio_query] "
-                f"status={r.status}"
-            )
-
-            query = await r.json()
+        # 現在のパラメータ反映
+        for k, v in current_params.items():
+            query[k] = v
 
         # synthesis
         async with session.post(
             f"{VOICEVOX_URL}/synthesis",
-            params={
-                "speaker": speaker
-            },
-            json=query
+            params={"speaker": spk_id},
+            data=json.dumps(query),
+            headers={"Content-Type": "application/json"},
         ) as r:
+            if r.status != 200:
+                body = await r.text()
+                raise RuntimeError(f"synthesis {r.status}: {body}")
+            return await r.read()  # wav bytes
 
-            print(
-                f"[VOICEVOX synthesis] "
-                f"status={r.status}"
-            )
 
-            audio = await r.read()
-
-    with open(path, "wb") as f:
-        f.write(audio)
-
-    print(
-        f"[VOICE FILE SAVED] "
-        f"{path}"
-    )
-
-    return path
-
-# =========================
-# キュー処理
-# =========================
-
-async def process_queue(guild_id: int):
-
-    while True:
-
-        session = tts_sessions.get(guild_id)
-
-        if not session:
-            return
-
-        queue: asyncio.Queue = session["queue"]
-
-        vc: discord.VoiceClient = session["voice_client"]
-
-        speaker = session["speaker"]
-
-        if not vc:
-
-            await asyncio.sleep(1)
-            continue
-
-        try:
-            text = await queue.get()
-
-            print(
-                f"[QUEUE GET] "
-                f"{text}"
-            )
-
-        except asyncio.CancelledError:
-            break
-
-        if not vc.is_connected():
-            break
-
-        try:
-
-            print(f"[VOICEVOX GENERATE] {text}")
-
-            path = await generate_tts(
-                text,
-                speaker
-            )
-
-            finished = asyncio.Event()
-
-            def after_play(error):
-
-                if error:
-                    print("[VOICE PLAY ERROR]", error)
-
-                print("[VOICE PLAY END]")
-
-                try:
-                    os.remove(path)
-                except:
-                    pass
-
-                loop = asyncio.get_event_loop()
-                loop.call_soon_threadsafe(finished.set)
-
-            source = discord.FFmpegPCMAudio(path)
-
-            print("[VOICE PLAY START]")
-
-            vc.play(source, after=after_play)
-
-            await asyncio.wait_for(
-                finished.wait(),
-                timeout=60
-            )
-
-        except Exception:
-
-            print("[VOICE ERROR]")
-            traceback.print_exc()
-
-# =========================
-# 話者変更Select
-# =========================
-
-class SpeakerSelect(discord.ui.Select):
-
-    def __init__(self):
-
-        options = [
-            discord.SelectOption(
-                label=name,
-                value=str(speaker_id)
-            )
-            for name, speaker_id in VOICE_SPEAKERS.items()
-        ]
-
-        super().__init__(
-            placeholder="話者を選択",
-            options=options
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-
-        guild_id = interaction.guild.id
-
-        session = tts_sessions.get(guild_id)
-
-        if not session:
-            return await interaction.response.send_message(
-                "❌ 読み上げ接続されていません。",
-                ephemeral=True
-            )
-
-        session["speaker"] = int(self.values[0])
-
-        speaker_name = next(
-            k for k, v in VOICE_SPEAKERS.items()
-            if v == int(self.values[0])
-        )
-
-        await interaction.response.send_message(
-            f"✅ 話者を「{speaker_name}」へ変更しました。",
-            ephemeral=True
-        )
-
-class SpeakerView(discord.ui.View):
-
-    def __init__(self):
-        super().__init__(timeout=60)
-
-        self.add_item(SpeakerSelect())
-
-# =========================
-# 移動確認View
-# =========================
-
-class MoveConfirmView(discord.ui.View):
-
-    def __init__(self, target_channel):
-        super().__init__(timeout=30)
-
-        self.target_channel = target_channel
-
-    @discord.ui.button(label="移動", style=discord.ButtonStyle.green)
-    async def move_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-
-        guild_id = interaction.guild.id
-
-        session = tts_sessions.get(guild_id)
-
-        if not session:
-            return await interaction.response.edit_message(
-                content="❌ 接続情報が見つかりません。",
-                view=None
-            )
-
-        vc: discord.VoiceClient = session["voice_client"]
-
-        await vc.move_to(self.target_channel)
-
-        session["text_channel_id"] = interaction.channel.id
-
-        await interaction.response.edit_message(
-            content=f"✅ {self.target_channel.mention} に移動しました。",
-            view=None
-        )
-
-    @discord.ui.button(label="キャンセル", style=discord.ButtonStyle.gray)
-    async def cancel_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        await interaction.response.edit_message(
-            content="キャンセルしました。",
-            view=None
-        )
-
-# =========================
-# /接続
-# =========================
-
-@bot.tree.command(name="接続")
-@app_commands.guilds(discord.Object(id=GUILD_ID))
-async def connect(interaction: discord.Interaction):
-
-    # ← 超重要
-    await interaction.response.defer(ephemeral=True)
-
-    if interaction.guild.id != GUILD_ID:
-        return
-
-    if not interaction.user.voice:
-
-        return await interaction.followup.send(
-            "❌ VCへ参加してください。",
-            ephemeral=True
-        )
-
-    target_channel = interaction.user.voice.channel
-
-    guild_id = interaction.guild.id
-
-    if guild_id in tts_sessions:
-
-        session = tts_sessions[guild_id]
-
-        vc = session["voice_client"]
-
-        if vc and vc.channel.id != target_channel.id:
-
-            humans = len([
-                m for m in vc.channel.members
-                if not m.bot
-            ])
-
-            embed = discord.Embed(
-                title="⚠️ 別VCで読み上げ中",
-                description=(
-                    f"現在 {vc.channel.mention} で読み上げ中\n"
-                    f"人数：{humans}名"
-                ),
-                color=discord.Color.orange()
-            )
-
-            return await interaction.followup.send(
-                embed=embed,
-                view=MoveConfirmView(target_channel),
-                ephemeral=True
-            )
-
-        return await interaction.followup.send(
-            "⚠️ すでに接続中です。",
-            ephemeral=True
-        )
-
-    queue = asyncio.Queue()
-
-    tts_sessions[guild_id] = {
-        "voice_client": None,
-        "text_channel_id": interaction.channel.id,
-        "queue": queue,
-        "task": None,
-        "speaker": 3,
-    }
-
-    task = asyncio.create_task(
-        process_queue(guild_id)
-    )
-
-    tts_sessions[guild_id]["task"] = task
-
+# ========= ギルド単位のクリーンリセット =========
+def reset_guild_audio(gid: int):
     try:
+        if gid in player_tasks and not player_tasks[gid].done():
+            player_tasks[gid].cancel()
+    except Exception:
+        pass
+    try:
+        if gid in voice_queues:
+            q = voice_queues[gid]
+            try:
+                while True:
+                    q.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+    except Exception:
+        pass
 
-        print(
-            f"[CONNECT START] "
-            f"user={interaction.user}"
-        )
 
-        print(
-            f"[CONNECT TARGET VC] "
-            f"{target_channel.name}"
-        )
+# ========= 再生ループ（/tmp・Opus出力・クリーンアップ・競合回避） =========
+async def ensure_player(vc: discord.VoiceClient):
+    gid = vc.guild.id
+    if gid in player_tasks and not player_tasks[gid].done():
+        return
+    if gid not in voice_queues:
+        voice_queues[gid] = asyncio.Queue()
 
-        print("[VOICE CONNECT BEGIN]")
-
-        await asyncio.sleep(2)
-
-        print("[VOICE WAIT START]")
-
-        vc = await target_channel.connect(
-            self_deaf=True
-        )
-
-        print("[VOICE WAIT END]")
-        print("[VOICE CONNECT SUCCESS]")
-        print(f"[VOICE CHANNEL] {vc.channel.name}")
-
-        tts_sessions[guild_id]["voice_client"] = vc
-
-        print("[VOICE CONNECT SUCCESS]")
-
-        print(
-            f"[VOICE CLIENT] "
-            f"is_connected={vc.is_connected()} "
-            f"channel={vc.channel}"
-        )
-
-        # warmup
+    async def _loop():
         try:
+            while vc.is_connected():
+                data = await voice_queues[gid].get()
 
-            warmup = await generate_tts(
-                "接続しました",
-                3
-            )
+                # 再生中なら終了を待つ（競合回避）
+                while vc.is_playing():
+                    await asyncio.sleep(0.1)
 
-            os.remove(warmup)
+                tmp = f"/tmp/vv_{gid}_{int(asyncio.get_event_loop().time())}.wav"
+                with open(tmp, "wb") as f:
+                    f.write(data)
 
-            print("[VOICEVOX WARMUP OK]")
+                source = discord.FFmpegOpusAudio(tmp)
+                done_evt = asyncio.Event()
+
+                def _after(_err):
+                    try:
+                        if hasattr(source, "cleanup"):
+                            source.cleanup()
+                    finally:
+                        try:
+                            os.remove(tmp)
+                        except Exception:
+                            pass
+                        done_evt.set()
+
+                vc.play(source, after=_after)
+                await done_evt.wait()
 
         except Exception as e:
+            print("[player_loop]", e)
 
-            print("[VOICEVOX WARMUP ERROR]", e)
+    player_tasks[gid] = asyncio.create_task(_loop())
 
-        await interaction.followup.send(
-            f"✅ {target_channel.mention} に接続しました。",
-            ephemeral=True
-        )
 
-    except Exception as e:
-
-        tts_sessions.pop(guild_id, None)
-
-        print("[VOICE CONNECT ERROR]")
-        traceback.print_exc()
-
-        await interaction.followup.send(
-            f"❌ 接続失敗\n{e}",
-            ephemeral=True
-        )
-
-# =========================
-# /切断
-# =========================
-
-@bot.tree.command(name="切断")
-@app_commands.guilds(discord.Object(id=GUILD_ID))
-async def disconnect(interaction: discord.Interaction):
-
-    if interaction.guild.id != GUILD_ID:
-        return
-
-    guild_id = interaction.guild.id
-
-    session = tts_sessions.get(guild_id)
-
-    if not session:
-        return await interaction.response.send_message(
-            "❌ 接続されていません。",
-            ephemeral=True
-        )
-
+# ========= 遅延クリーンアップ（切断→少し待って未接続ならリセット） =========
+async def _delayed_cleanup(gid: int, delay: float = 2.0):
     try:
-        session["task"].cancel()
-    except:
-        pass
-
-    try:
-        await session["voice_client"].disconnect(force=True)
-    except:
-        pass
-
-    tts_sessions.pop(guild_id, None)
-
-    await interaction.response.send_message(
-        "👋 切断しました。",
-        ephemeral=True
-    )
-
-# =========================
-# /話者変更
-# =========================
-
-@bot.tree.command(name="話者変更")
-@app_commands.guilds(discord.Object(id=GUILD_ID))
-async def speaker_change(interaction: discord.Interaction):
-
-    if interaction.guild.id != GUILD_ID:
+        await asyncio.sleep(delay)
+        guild = bot.get_guild(gid)
+        vc = guild.voice_client if guild else None
+        if vc and vc.is_connected():
+            return  # もう再接続済み
+        reset_guild_audio(gid)
+        print(f"[cleanup] delayed voice reset for guild {gid} (still disconnected)")
+    except asyncio.CancelledError:
         return
 
-    await interaction.response.send_message(
-        "🎤 話者を選択してください",
-        view=SpeakerView(),
-        ephemeral=True
-    )
 
-# =========================
-# メッセージ読み上げ
-# =========================
-
-@bot.event
-async def on_message(message: discord.Message):
-
-    if message.author.bot:
-        return
-
-    print(
-        f"[MESSAGE RECEIVE] "
-        f"user={message.author} "
-        f"text={message.content}"
-    )
-
-    if not message.guild:
-        return
-
-    guild_id = message.guild.id
-
-    session = tts_sessions.get(guild_id)
-
-    if not session:
-        return
-
-    if message.channel.id != session["text_channel_id"]:
-        return
-
-    now = asyncio.get_event_loop().time()
-
-    last = user_cooldowns.get(message.author.id, 0)
-
-    if now - last < 2:
-        return
-
-    user_cooldowns[message.author.id] = now
-
-    text = sanitize_text(message.content)
-
-    if not text:
-        return
-
-    print(
-        f"[QUEUE PUT] "
-        f"{text}"
-    )
-
-    await session["queue"].put(text)
-
-# =========================
-# VC退出検知
-# =========================
-
-@bot.event
-async def on_voice_state_update(
-    member,
-    before,
-    after
+# ========= 安全なVC接続（defer/followup運用・ロック・4006対策） =========
+async def safe_connect_to_user_channel(
+    interaction: discord.Interaction,
+    status_msg: discord.Message | None = None,
+    max_attempts: int = 4
 ):
+    if not interaction.user.voice or not interaction.user.voice.channel:
+        await interaction.followup.send("先にVCへ入室してください。", ephemeral=True)
+        return None
 
-    guild_id = member.guild.id
+    target = interaction.user.voice.channel
+    gid = interaction.guild.id
+    lock = guild_connect_locks.setdefault(gid, asyncio.Lock())
 
-    session = tts_sessions.get(guild_id)
+    # “接続中…”メッセージを用意
+    if status_msg is None:
+        status_msg = await interaction.followup.send(f"⏳ {target.mention} に接続中…", ephemeral=True, wait=True)
 
-    if not session:
+    async with lock:
+        vc = interaction.guild.voice_client
+
+        # 既に同じVC
+        if vc and vc.is_connected() and vc.channel and vc.channel.id == target.id:
+            await status_msg.edit(content=f"🔊 既に {target.mention} に接続済みです。")
+            return vc
+
+        # 別VC→移動を優先
+        if vc and vc.is_connected() and vc.channel and vc.channel.id != target.id:
+            try:
+                await vc.move_to(target)
+                await status_msg.edit(content=f"↪️ {target.mention} に移動しました。")
+                return vc
+            except Exception:
+                try:
+                    await vc.disconnect(force=True)
+                except Exception:
+                    pass
+                await asyncio.sleep(1.2)
+
+        # 孤児化した vc が残っていたら壊す
+        if vc and not vc.is_connected():
+            try:
+                await vc.disconnect(force=True)
+            except Exception:
+                pass
+            await asyncio.sleep(1.0)
+
+        # 新規接続：4006 は完全切断→クールダウン→再試行
+        last_err = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                # reconnect=False にして失敗は必ずこちらで制御
+                vc = await target.connect(timeout=12.0, reconnect=False, self_deaf=True, self_mute=False)
+                await status_msg.edit(content=f"🔊 {target.mention} に接続しました。")
+                return vc
+            except discord.errors.ConnectionClosed as e:
+                last_err = e
+                # 4006: Invalid Session → 完全切断してから待機
+                try:
+                    tmp_vc = interaction.guild.voice_client
+                    if tmp_vc:
+                        await tmp_vc.disconnect(force=True)
+                except Exception:
+                    pass
+                await asyncio.sleep(2.0 * attempt + (asyncio.get_event_loop().time() % 0.5))
+            except asyncio.TimeoutError as e:
+                last_err = e
+                await asyncio.sleep(1.5 * attempt)
+            except Exception as e:
+                last_err = e
+                break
+
+        # 最終確認：接続済みなら成功扱い
+        vc_now = interaction.guild.voice_client
+        if vc_now and vc_now.is_connected():
+            await status_msg.edit(content=f"🔊 {target.mention} に接続しました。")
+            return vc_now
+
+        await status_msg.edit(content=f"⚠️ 接続に失敗しました: {type(last_err).__name__} {last_err}")
+        return None
+
+
+# ========= イベント：Botの入退室で遅延クリーンアップ制御 =========
+@bot.event
+async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    if not bot.user or member.id != bot.user.id:
+        return
+    gid = member.guild.id
+
+    # 参加 → 保留中のクリーンアップをキャンセル
+    if after.channel and not before.channel:
+        task = disconnect_cleanup_tasks.pop(gid, None)
+        if task and not task.done():
+            task.cancel()
         return
 
-    vc = session["voice_client"]
+    # 完全にいなくなった（切断）→ 遅延クリーンアップ
+    if before.channel and not after.channel:
+        old = disconnect_cleanup_tasks.get(gid)
+        if old and not old.done():
+            old.cancel()
+        disconnect_cleanup_tasks[gid] = asyncio.create_task(_delayed_cleanup(gid, delay=2.0))
 
-    if not vc:
-        return
 
-    humans = [
-        m for m in vc.channel.members
-        if not m.bot
-    ]
-
-    if len(humans) == 0:
-
-        try:
-            session["task"].cancel()
-        except:
-            pass
-
-        try:
-            await vc.disconnect(force=True)
-        except:
-            pass
-
-        tts_sessions.pop(guild_id, None)
-
-        print(f"[VOICE AUTO DISCONNECT] {guild_id}")
-
-# =========================
-# 起動
-# =========================
-
+# ========= スラッシュコマンド =========
 @bot.event
 async def on_ready():
+    print(f"Using VOICEVOX_URL={VOICEVOX_URL}")
+    # 起動時疎通チェック
+    try:
+        async with _make_session() as s:
+            async with s.get(f"{VOICEVOX_URL}/speakers", timeout=6) as r:
+                r.raise_for_status()
+        print(f"VOICEVOX OK: {VOICEVOX_URL}")
+    except Exception as e:
+        print(f"VOICEVOX NG: {VOICEVOX_URL} -> {e}")
+
+    # コマンド同期
+    try:
+        if GUILD_IDS:
+            for gid in GUILD_IDS:
+                await tree.sync(guild=discord.Object(id=gid))
+            print(f"Synced to guilds: {GUILD_IDS}")
+        else:
+            await tree.sync()
+            print("Synced globally")
+    except Exception as e:
+        print("Sync error:", e)
+
+    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+
+
+@tree.command(name="sync", description="このサーバーにコマンドを即時同期（管理者専用）")
+async def sync_here(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("管理者のみ実行可です。", ephemeral=True)
+    await tree.sync(guild=interaction.guild)
+    await interaction.response.send_message("✅ このサーバーに同期しました。", ephemeral=True)
+
+
+@tree.command(name="join", description="あなたのいるVCに参加します。")
+@app_commands.checks.bot_has_permissions(connect=True, speak=True)
+async def join_cmd(interaction: discord.Interaction):
+    # Unknown interaction防止：先に defer
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    status = await interaction.followup.send("⏳ 接続中…", ephemeral=True, wait=True)
+    vc = await safe_connect_to_user_channel(interaction, status_msg=status)
+    if vc:
+        await ensure_player(vc)
+
+
+@tree.command(name="leave", description="VCから退出します。")
+async def leave_cmd(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    vc = interaction.guild.voice_client
+    if not vc:
+        return await interaction.followup.send("未接続です。", ephemeral=True)
+
+    gid = interaction.guild.id
+    reset_guild_audio(gid)
+    try:
+        if vc.is_playing():
+            vc.stop()
+    except Exception:
+        pass
 
     try:
+        await vc.disconnect(force=True)
+    finally:
+        await interaction.followup.send("👋 切断しました。", ephemeral=True)
+        await asyncio.sleep(1.0)
 
-        guild = discord.Object(id=GUILD_ID)
 
-        synced = await bot.tree.sync(guild=guild)
+@tree.command(name="say", description="テキストを読み上げます。")
+@app_commands.describe(text="読み上げる内容")
+async def say_cmd(interaction: discord.Interaction, text: str):
+    await interaction.response.defer(thinking=True, ephemeral=True)
 
-        print(f"Slash Command 同期完了: {len(synced)}")
+    vc = interaction.guild.voice_client
+    if not vc or not vc.is_connected():
+        status = await interaction.followup.send("⏳ 接続を準備中…", ephemeral=True, wait=True)
+        vc = await safe_connect_to_user_channel(interaction, status_msg=status)
+        if not vc:
+            return
 
-    except Exception as e:
+    audio = await synth_voicevox(text)
+    await voice_queues.setdefault(interaction.guild.id, asyncio.Queue()).put(audio)
+    await ensure_player(vc)
+    await interaction.followup.send("📣 キューに追加しました。", ephemeral=True)
 
-        print("[SYNC ERROR]", e)
 
-    print(f"ログイン完了: {bot.user}")
+# VOICEVOX設定
+vv_group = app_commands.Group(name="vv", description="VOICEVOX設定")
 
-bot.run(TOKEN)
+@vv_group.command(name="voice", description="話者/スタイルを切替（例: 春日部つむぎ ノーマル）")
+@app_commands.describe(speaker_name="話者名", style_name="スタイル名")
+async def vv_voice(interaction: discord.Interaction, speaker_name: str, style_name: str):
+    global current_speaker_name, current_style_name
+    current_speaker_name = speaker_name
+    current_style_name = style_name
+    await interaction.response.send_message(f"🎙️ 声を `{speaker_name} / {style_name}` に変更しました。")
+
+@vv_group.command(name="speed", description="話速 (0.5〜2.0)")
+async def vv_speed(interaction: discord.Interaction, value: app_commands.Range[float, 0.5, 2.0]):
+    current_params["speedScale"] = float(value)
+    await interaction.response.send_message(f"⏩ speed = {current_params['speedScale']}")
+
+@vv_group.command(name="pitch", description="ピッチ (-1.0〜1.0)")
+async def vv_pitch(interaction: discord.Interaction, value: app_commands.Range[float, -1.0, 1.0]):
+    current_params["pitchScale"] = float(value)
+    await interaction.response.send_message(f"🎵 pitch = {current_params['pitchScale']}")
+
+@vv_group.command(name="intonation", description="抑揚 (0.0〜2.0)")
+async def vv_intonation(interaction: discord.Interaction, value: app_commands.Range[float, 0.0, 2.0]):
+    current_params["intonationScale"] = float(value)
+    await interaction.response.send_message(f"📈 intonation = {current_params['intonationScale']}")
+
+@vv_group.command(name="reset", description="しゃきぴよ風プリセットにリセット")
+async def vv_reset(interaction: discord.Interaction):
+    global current_params
+    current_params = SHAKIPIYO_PARAMS.copy()
+    await interaction.response.send_message("♻️ パラメータをリセットしました（しゃきぴよ風）。")
+
+tree.add_command(vv_group)
+
+@tree.command(name="credit", description="利用中キャラクターのクレジットを表示します。")
+async def credit_cmd(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        f"このBotは VOICEVOX:{current_speaker_name} の音声ライブラリを利用しています。"
+    )
+
+# ====== 起動 ======
+if not DISCORD_TOKEN:
+    raise RuntimeError("環境変数 DISCORD_TOKEN が未設定です。")
+bot.run(DISCORD_TOKEN)
