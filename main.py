@@ -320,12 +320,15 @@ class MoveConfirmView(discord.ui.View):
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 async def connect(interaction: discord.Interaction):
 
+    # ← 超重要
+    await interaction.response.defer(ephemeral=True)
+
     if interaction.guild.id != GUILD_ID:
         return
 
     if not interaction.user.voice:
 
-        return await interaction.response.send_message(
+        return await interaction.followup.send(
             "❌ VCへ参加してください。",
             ephemeral=True
         )
@@ -356,13 +359,13 @@ async def connect(interaction: discord.Interaction):
                 color=discord.Color.orange()
             )
 
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 embed=embed,
                 view=MoveConfirmView(target_channel),
                 ephemeral=True
             )
 
-        return await interaction.response.send_message(
+        return await interaction.followup.send(
             "⚠️ すでに接続中です。",
             ephemeral=True
         )
@@ -385,7 +388,10 @@ async def connect(interaction: discord.Interaction):
 
     try:
 
-        vc = await target_channel.connect()
+        vc = await target_channel.connect(
+            reconnect=True,
+            self_deaf=True
+        )
 
         tts_sessions[guild_id]["voice_client"] = vc
 
@@ -405,7 +411,7 @@ async def connect(interaction: discord.Interaction):
 
             print("[VOICEVOX WARMUP ERROR]", e)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ {target_channel.mention} に接続しました。",
             ephemeral=True
         )
@@ -414,7 +420,9 @@ async def connect(interaction: discord.Interaction):
 
         tts_sessions.pop(guild_id, None)
 
-        await interaction.response.send_message(
+        print("[VOICE CONNECT ERROR]", e)
+
+        await interaction.followup.send(
             f"❌ 接続失敗\n{e}",
             ephemeral=True
         )
