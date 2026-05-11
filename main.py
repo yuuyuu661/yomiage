@@ -11,7 +11,7 @@ import aiohttp
 # 設定
 # =========================
 
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 GUILD_ID = 1420918259187712093
 
