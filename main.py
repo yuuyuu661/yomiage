@@ -471,7 +471,7 @@ async def connect(interaction: discord.Interaction):
             ephemeral=True
         )
 
-    except Exception:
+    except Exception as e:
 
         tts_sessions.pop(guild_id, None)
 
