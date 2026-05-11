@@ -11,7 +11,7 @@ from discord.ext import commands
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 # 公開URL: https://<engine>.up.railway.app（ポートなし/https）
 # Private:  http://voicevox_engine.railway.internal:50021（※IPv6-only環境は不可）
-VOICEVOX_URL = os.getenv("VOICEVOX_URL", "https://example.up.railway.app")
+VOICEVOX_URL = os.getenv("VOICEVOX_URL", "https://voicevoxengine-production-867f.up.railway.app")
 
 # デフォルト話者・スタイル（Variablesで上書き可）
 DEFAULT_SPEAKER_NAME = os.getenv("VV_SPEAKER_NAME", "春日部つむぎ")
