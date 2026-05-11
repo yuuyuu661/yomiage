@@ -433,10 +433,11 @@ async def connect(interaction: discord.Interaction):
 
         vc = await asyncio.wait_for(
             target_channel.connect(
-                reconnect=True,
-                self_deaf=True
+                reconnect=False,
+                self_deaf=True,
+                timeout=30.0
             ),
-            timeout=20
+            timeout=40
         )
 
         tts_sessions[guild_id]["voice_client"] = vc
