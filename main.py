@@ -433,6 +433,8 @@ async def connect(interaction: discord.Interaction):
 
         await asyncio.sleep(2)
 
+        print("[VOICE WAIT START]")
+
         vc = await asyncio.wait_for(
             target_channel.connect(
                 reconnect=False,
@@ -441,6 +443,10 @@ async def connect(interaction: discord.Interaction):
             ),
             timeout=70
         )
+
+        print("[VOICE WAIT END]")
+        print("[VOICE CONNECT SUCCESS]")
+        print(f"[VOICE CHANNEL] {vc.channel.name}")
 
         tts_sessions[guild_id]["voice_client"] = vc
 
