@@ -439,4 +439,3 @@ client.on(
 );
 
 client.login(TOKEN);
-```
