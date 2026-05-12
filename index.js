@@ -10,6 +10,10 @@ const {
 } = require("discord.js");
 
 const {
+    StreamType,
+} = require("@discordjs/voice");
+
+const {
     joinVoiceChannel,
     createAudioPlayer,
     createAudioResource,
@@ -138,7 +142,12 @@ async function processQueue(guildId) {
                 session.speaker
             );
 
-            const resource = createAudioResource(wavPath);
+            const resource = createAudioResource(
+                wavPath,
+                {
+                    inputType: StreamType.Arbitrary,
+                }
+            );
 
             session.player.play(resource);
 
