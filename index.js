@@ -147,6 +147,8 @@ async function processQueue(guildId) {
                 session.speaker
             );
 
+            console.log("[PLAY FILE]", wavPath);
+
             const resource = createAudioResource(
                 wavPath,
                 {
@@ -154,7 +156,11 @@ async function processQueue(guildId) {
                 }
             );
 
+            console.log("[RESOURCE CREATED]");
+
             session.player.play(resource);
+
+            console.log("[PLAYER PLAY CALLED]");
 
             await entersState(
                 session.player,
