@@ -14,16 +14,12 @@ from discord import app_commands
 # opus
 # =========================
 
+try:
+    discord.opus.load_opus("libopus.so.0")
+except Exception as e:
+    print("opus load error:", e)
+
 print("opus loaded:", discord.opus.is_loaded())
-
-# =========================
-# 環境変数
-# =========================
-
-TOKEN = os.getenv("DISCORD_TOKEN")
-
-if not TOKEN:
-    raise ValueError("DISCORD_TOKEN が設定されていません")
 
 # =========================
 # 設定
