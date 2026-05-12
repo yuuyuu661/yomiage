@@ -14,7 +14,7 @@ from discord import app_commands
 # opus
 # =========================
 
-discord.opus.load_opus("libopus.so.0")
+print("opus loaded:", discord.opus.is_loaded())
 
 # =========================
 # 環境変数
