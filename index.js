@@ -266,6 +266,22 @@ client.on(Events.InteractionCreate, async interaction => {
                     },
                 });
 
+                // ===== ログ追加 =====
+
+                player.on("error", error => {
+                    console.error("[PLAYER ERROR]", error);
+                });
+
+                player.on(AudioPlayerStatus.Playing, () => {
+                    console.log("[PLAYER STATUS] Playing");
+                });
+
+                player.on(AudioPlayerStatus.Idle, () => {
+                    console.log("[PLAYER STATUS] Idle");
+                });
+
+                // ====================
+
                 connection.subscribe(player);
 
                 sessions.set(guildId, {
