@@ -79,41 +79,44 @@ function sanitizeText(text) {
     return text;
 }
 
+```js
 async function generateTTS(text, speaker) {
 
     console.log("[VOICEVOX REQUEST]", text);
 
+    // audio_query
     const queryRes = await axios.post(
         `${VOICEVOX_URL}/audio_query`,
         null,
         {
             params: {
-                text,
-                speaker,
-            },
+                text: text,
+                speaker: speaker
+            }
         }
     );
 
+    // synthesis
     const synthesisRes = await axios.post(
         `${VOICEVOX_URL}/synthesis`,
         queryRes.data,
         {
             params: {
-                speaker,
+                speaker: speaker
             },
-            responseType: "arraybuffer",
+            responseType: "arraybuffer"
         }
     );
 
-    const tempPath = path.join(
-        os.tmpdir(),
-        `voice_${Date.now()}.wav`
-    );
+    // wav保存
+    const filePath = `/tmp/${Date.now()}.wav`;
 
-    fs.writeFileSync(tempPath, synthesisRes.data);
+    fs.writeFileSync(filePath, synthesisRes.data);
 
-    return tempPath;
+    return filePath;
 }
+```
+
 
 async function processQueue(guildId) {
 
