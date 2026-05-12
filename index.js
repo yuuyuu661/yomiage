@@ -86,6 +86,30 @@ async function generateTTS(text, speaker) {
 
     console.log("[VOICEVOX REQUEST]", text);
 
+    try {
+
+        const test = await axios.get(
+            `${VOICEVOX_URL}/version`,
+            {
+                timeout: 5000
+            }
+        );
+
+        console.log(
+            "[VOICEVOX VERSION]",
+            test.data
+        );
+
+    } catch (e) {
+
+        console.error(
+            "[VOICEVOX CONNECTION ERROR]",
+            e
+        );
+
+        throw e;
+    }
+
     // audio_query
     const queryRes = await axios.post(
         `${VOICEVOX_URL}/audio_query`,
