@@ -91,7 +91,7 @@ async function generateTTS(text, speaker) {
         const test = await axios.get(
             `${VOICEVOX_URL}/version`,
             {
-                timeout: 5000
+                timeout: 30000
             }
         );
 
@@ -118,7 +118,8 @@ async function generateTTS(text, speaker) {
             params: {
                 text: text,
                 speaker: speaker
-            }
+            },
+            timeout: 30000
         }
     );
 
@@ -130,7 +131,8 @@ async function generateTTS(text, speaker) {
             params: {
                 speaker: speaker
             },
-            responseType: "arraybuffer"
+            responseType: "arraybuffer",
+            timeout: 60000
         }
     );
 
