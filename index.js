@@ -235,8 +235,10 @@ client.on(Events.InteractionCreate, async interaction => {
                     adapterCreator:
                         interaction.guild.voiceAdapterCreator,
                     selfDeaf: true,
+                    selfMute: false,
+                    group: "default",
                 });
-
+                
                 await entersState(
                     connection,
                     VoiceConnectionStatus.Ready,
