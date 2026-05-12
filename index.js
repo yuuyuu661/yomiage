@@ -1,4 +1,3 @@
-```js
 const {
     Client,
     GatewayIntentBits,
@@ -79,7 +78,6 @@ function sanitizeText(text) {
     return text;
 }
 
-```js
 async function generateTTS(text, speaker) {
 
     console.log("[VOICEVOX REQUEST]", text);
@@ -115,7 +113,7 @@ async function generateTTS(text, speaker) {
 
     return filePath;
 }
-```
+
 
 
 async function processQueue(guildId) {
