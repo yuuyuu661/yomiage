@@ -115,6 +115,11 @@ async function generateTTS(text, speaker) {
 
     fs.writeFileSync(filePath, synthesisRes.data);
 
+    console.log(
+        "[VOICE FILE SIZE]",
+        fs.statSync(filePath).size
+    );
+
     return filePath;
 }
 
