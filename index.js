@@ -236,14 +236,19 @@ client.on(Events.InteractionCreate, async interaction => {
                         interaction.guild.voiceAdapterCreator,
                     selfDeaf: true,
                     selfMute: false,
-                    group: "default",
+                });
+
+                connection.on("stateChange", (oldState, newState) => {
+                    console.log(
+                        `[VOICE STATE] ${oldState.status} -> ${newState.status}`
+                    );
                 });
                 
-                await entersState(
-                    connection,
-                    VoiceConnectionStatus.Ready,
-                    30000
-                );
+                // await entersState(
+                //     connection,
+                //     VoiceConnectionStatus.Ready,
+                //     30000
+                // );
 
                 const player = createAudioPlayer({
                     behaviors: {
