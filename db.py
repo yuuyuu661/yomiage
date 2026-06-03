@@ -49,10 +49,7 @@ class Database:
             room_id TEXT PRIMARY KEY
         )
         """)
-        await self.execute("""
-        ALTER TABLE life_panels
-        ADD COLUMN IF NOT EXISTS room_id TEXT
-        """)
+
         
         await self.execute("""
         CREATE TABLE IF NOT EXISTS life_user_progress (
