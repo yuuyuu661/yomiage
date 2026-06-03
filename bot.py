@@ -2,6 +2,7 @@ import os
 import asyncio
 import discord
 import uvicorn
+import secrets
 
 from discord.ext import commands
 from discord import app_commands
@@ -68,6 +69,11 @@ class LifeBot(commands.Bot):
 
 
 bot = LifeBot()
+
+
+def generate_room_id():
+
+    return secrets.token_hex(3).upper()
 
 
 def has_admin_role(member):
@@ -179,28 +185,29 @@ async def create_panel(
         return
 
     row = await bot.db.fetchrow("""
-
-    INSERT INTO life_panels (
+    room_id = generate_room_id()
+    await bot.db.execute("""
+    INSERT INTO life_rooms (
+        room_id,
         title,
-        description
+        description,
+        created_by
     )
-
-    VALUES ($1, $2)
-
-    RETURNING id
-
+    VALUES ($1, $2, $3, $4)
     """,
-
+        room_id,
         title,
-        description
+        description,
+        str(interaction.user.id)
     )
-
+    site_url = (
+        f"https://YOUR_SITE_URL/life/{room_id}"
+    )
     await interaction.response.send_message(
-
-        f"パネル生成完了\n"
-        f"ID: {row['id']}\n"
-        f"タイトル: {title}"
-
+        f"🎲 人生ゲームパネル生成完了\n\n"
+        f"タイトル: {title}\n"
+        f"ROOM ID: {room_id}\n\n"
+        f"{site_url}"
     )
 
 
