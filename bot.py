@@ -208,8 +208,8 @@ class LifeLinkView(View):
 
         url = (
             f"{LIFE_BASE_URL}"
-            f"/life/{self.room_id}"
-            f"?session={session_token}"
+            f"?room={self.room_id}"
+            f"&session={session_token}"
         )
 
         await interaction.followup.send(
