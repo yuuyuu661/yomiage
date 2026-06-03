@@ -455,8 +455,10 @@ async def create_panel(
 
     view = LifeLinkView(bot, room_id)
 
+    bot.add_view(view)
+
     await interaction.response.send_message(
-        embed=embed,
+       embed=embed,
         view=view
     )
 
