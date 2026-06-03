@@ -242,6 +242,7 @@ async def on_ready():
 )
 async def add_dice(
     interaction: discord.Interaction,
+    room_id: str,
     user: discord.Member,
     amount: int,
     memo: str = None
@@ -258,21 +259,29 @@ async def add_dice(
     await bot.db.execute("""
 
     INSERT INTO life_user_progress (
+
         user_id,
-        dice_count
+        room_id,
+        dice_count,
+        position
+
     )
 
-    VALUES ($1, $2)
+    VALUES ($1, $2, $3, $4)
 
-    ON CONFLICT (user_id)
+    ON CONFLICT (user_id, room_id)
 
     DO UPDATE SET
-    dice_count = life_users.dice_count + $2
+
+    dice_count =
+    life_user_progress.dice_count + $3
 
     """,
 
         str(user.id),
-        amount
+        room_id,
+        amount,
+        0
     )
 
     await bot.db.execute("""
@@ -280,17 +289,19 @@ async def add_dice(
     INSERT INTO life_history (
 
         user_id,
+        room_id,
         action_type,
         message,
         memo
 
     )
 
-    VALUES ($1, $2, $3, $4)
+    VALUES ($1, $2, $3, $4, $5)
 
     """,
 
         str(user.id),
+        room_id,
         "dice_add",
         f"サイコロ {amount}個付与",
         memo
