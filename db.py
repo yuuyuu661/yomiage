@@ -88,5 +88,15 @@ class Database:
             guild_id TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
+
+        await self.execute("""
+        CREATE TABLE IF NOT EXISTS life_tiles (
+            id SERIAL PRIMARY KEY,
+            room_id TEXT NOT NULL,
+            tile_index INTEGER NOT NULL,
+            tile_type TEXT NOT NULL,
+            tile_text TEXT NOT NULL
+        )
+        """)
         """)
 
