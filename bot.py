@@ -11,6 +11,10 @@ from dotenv import load_dotenv
 from db import Database
 from api import app
 
+from zoneinfo import ZoneInfo
+
+JST = ZoneInfo("Asia/Tokyo")
+
 load_dotenv()
 
 ADMIN_ROLE_IDS = [
@@ -245,8 +249,14 @@ async def history(
 
     for row in rows:
 
+        jst_time = row["created_at"].astimezone(JST)
+
+        time_str = jst_time.strftime(
+            "%m/%d %H:%M"
+        )
+
         text += (
-            f"{row['created_at']}\n"
+            f"{time_str}\n"
             f"{row['message']}\n"
         )
 
