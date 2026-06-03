@@ -80,7 +80,7 @@ class Database:
         # 人生ゲーム session
         # =========================
 
-        await self._execute("""
+        await self.execute("""
         CREATE TABLE IF NOT EXISTS life_sessions (
             id SERIAL PRIMARY KEY,
             session_token TEXT UNIQUE NOT NULL,
