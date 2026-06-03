@@ -53,6 +53,27 @@ class LifeBot(commands.Bot):
 
         print("スラッシュ同期")
         await self.tree.sync()
+        print("人生パネル復元")
+
+        rows = await self.db.fetch("""
+
+        SELECT *
+        FROM life_panels
+
+        """)
+
+        for row in rows:
+
+            self.add_view(
+                LifeLinkView(
+                    self,
+                    row["room_id"]
+                )
+            )
+
+            print(
+                f"復元: {row['room_id']}"
+            )
 
         asyncio.create_task(
             self.start_api()
