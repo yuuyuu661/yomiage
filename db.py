@@ -36,52 +36,46 @@ class Database:
     async def init_db(self):
 
         await self.execute("""
-
-        CREATE TABLE IF NOT EXISTS life_users (
-
-            user_id TEXT PRIMARY KEY,
-
-            dice_count INTEGER NOT NULL DEFAULT 0,
-
-            position INTEGER NOT NULL DEFAULT 0,
-
-            created_at TIMESTAMP DEFAULT NOW()
-
-        )
-
-        """)
-
-        await self.execute("""
-
-        CREATE TABLE IF NOT EXISTS life_panels (
-
-            id SERIAL PRIMARY KEY,
-
+        CREATE TABLE IF NOT EXISTS life_rooms (
+            room_id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
-
             description TEXT NOT NULL,
-
+            created_by TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT NOW()
-
         )
-
+        """)
+        
+        await self.execute("""
+        CREATE TABLE IF NOT EXISTS life_user_progress (
+            user_id TEXT NOT NULL,
+            room_id TEXT NOT NULL,
+            dice_count INTEGER NOT NULL DEFAULT 0,
+            position INTEGER NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT NOW(),
+            PRIMARY KEY (user_id, room_id)
+        )
         """)
 
         await self.execute("""
-
-        CREATE TABLE IF NOT EXISTS life_history (
-
+        CREATE TABLE IF NOT EXISTS life_panels (
             id SERIAL PRIMARY KEY,
-
-            user_id TEXT NOT NULL,
-
-            action_type TEXT NOT NULL,
-
-            message TEXT NOT NULL,
-
-            memo TEXT,
-
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT NOW()
+        )
+        """)
+
+        await self.execute("""
+        CREATE TABLE IF NOT EXISTS life_history (
+            id SERIAL PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            room_id TEXT NOT NULL,
+            action_type TEXT NOT NULL,
+            message TEXT NOT NULL,
+            memo TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """)
 
         )
 
