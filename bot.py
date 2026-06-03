@@ -400,6 +400,22 @@ async def create_panel(
         str(interaction.user.id)
 
     )
+    await bot.db.execute("""
+
+    INSERT INTO life_panels (
+
+        room_id
+
+    )
+
+    VALUES ($1)
+
+    ON CONFLICT DO NOTHING
+
+    """,
+
+        room_id
+    )
 
 
 
