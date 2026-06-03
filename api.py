@@ -157,3 +157,24 @@ async def get_me(
         "dice_count": dice_count
 
     }
+
+@app.get("/")
+async def root():
+
+    print("ROOT ACCESS")
+
+    return {
+        "status": "ok"
+    }
+
+@app.get("/life/{room_id}")
+async def life_room(
+    room_id: str,
+    session: str = None
+):
+
+    print(
+        f"LIFE ROOM ACCESS "
+        f"room={room_id} "
+        f"session={session}"
+    )
