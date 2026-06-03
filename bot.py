@@ -59,10 +59,16 @@ class LifeBot(commands.Bot):
 
     async def start_api(self):
 
+        port = int(
+            os.getenv("PORT", 8080)
+        )
+
+        print(f"API起動 PORT={port}")
+
         config = uvicorn.Config(
             app,
             host="0.0.0.0",
-            port=int(os.getenv("PORT", 8080)),
+            port=port,
             log_level="info"
         )
 
