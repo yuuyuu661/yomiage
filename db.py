@@ -101,5 +101,4 @@ class Database:
             tile_text TEXT NOT NULL
         )
         """)
-        """)
 
