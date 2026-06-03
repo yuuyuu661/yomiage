@@ -80,6 +80,12 @@ class Database:
             created_at TIMESTAMP DEFAULT NOW()
         )
         """)
+
+        await self.execute("""
+        ALTER TABLE life_history
+        ADD COLUMN IF NOT EXISTS room_id TEXT
+        """)
+        
         # =========================
         # 人生ゲーム session
         # =========================
