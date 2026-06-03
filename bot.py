@@ -201,41 +201,52 @@ async def create_panel(
         )
         return
 
-    row = await bot.db.fetchrow("""
     room_id = generate_room_id()
+
     await bot.db.execute("""
+
     INSERT INTO life_rooms (
         room_id,
         title,
         description,
         created_by
     )
+
     VALUES ($1, $2, $3, $4)
+
     """,
+
         room_id,
         title,
         description,
         str(interaction.user.id)
+
     )
+
     site_url = (
         f"https://YOUR_SITE_URL/life/{room_id}"
     )
+
     embed = discord.Embed(
         title="🎲 人生ゲーム",
         description=description,
         color=0xffd54f
     )
+
     embed.add_field(
         name="タイトル",
         value=title,
         inline=False
     )
+
     embed.add_field(
         name="ROOM ID",
         value=room_id,
         inline=False
     )
+
     view = LifeLinkView(site_url)
+
     await interaction.response.send_message(
         embed=embed,
         view=view
