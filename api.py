@@ -207,3 +207,96 @@ async def get_me(
         "dice_count": dice_count
 
     }
+@app.post("/api/life/roll/{room_id}")
+async def roll_dice(
+    room_id: str,
+    session: str
+):
+
+    import random
+
+    session_row = await db.fetchrow("""
+
+    SELECT *
+    FROM life_sessions
+    WHERE session_token = $1
+
+    """,
+
+        session
+    )
+
+    if not session_row:
+
+        return {
+            "error": "invalid session"
+        }
+
+    user_id = session_row["user_id"]
+
+    progress = await db.fetchrow("""
+
+    SELECT *
+    FROM life_user_progress
+    WHERE user_id = $1
+    AND room_id = $2
+
+    """,
+
+        user_id,
+        room_id
+    )
+
+    if not progress:
+
+        return {
+            "error": "no progress"
+        }
+
+    current_position = progress["position"]
+
+    dice = random.randint(1, 6)
+
+    new_position = min(
+        current_position + dice,
+        99
+    )
+
+    await db.execute("""
+
+    UPDATE life_user_progress
+
+    SET
+        position = $1,
+        updated_at = NOW()
+
+    WHERE user_id = $2
+    AND room_id = $3
+
+    """,
+
+        new_position,
+        user_id,
+        room_id
+    )
+
+    tile = await db.fetchrow("""
+
+    SELECT *
+    FROM life_tiles
+    WHERE room_id = $1
+    AND tile_index = $2
+
+    """,
+
+        room_id,
+        new_position
+    )
+
+    return {
+
+        "dice": dice,
+        "position": new_position,
+        "tile": dict(tile)
+
+    }
