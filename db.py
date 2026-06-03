@@ -36,6 +36,12 @@ class Database:
     async def init_db(self):
 
         await self.execute("""
+
+            DROP TABLE IF EXISTS life_panels
+
+            """)
+
+        await self.execute("""
         CREATE TABLE IF NOT EXISTS life_rooms (
             room_id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
