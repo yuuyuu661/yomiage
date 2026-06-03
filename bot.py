@@ -23,6 +23,7 @@ load_dotenv()
 ADMIN_ROLE_IDS = [
     1310906528517062770
 ]
+LIFE_BASE_URL = "https://jinseigame-production.up.railway.app"
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -77,19 +78,63 @@ def generate_room_id():
 
     return secrets.token_hex(3).upper()
 
+def generate_session_token():
+
+    return secrets.token_urlsafe(32)
+
 class LifeLinkView(View):
 
-    def __init__(self, url):
+    def __init__(self, bot, room_id):
 
         super().__init__(timeout=None)
 
-        self.add_item(
+        self.bot = bot
+        self.room_id = room_id
 
-            Button(
-                label="🎲 人生ゲームサイト",
-                url=url
-            )
+    @discord.ui.button(
+        label="🎲 人生ゲームサイト",
+        style=discord.ButtonStyle.green,
+        custom_id="life:open"
+    )
+    async def open_life(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
 
+        await interaction.response.defer(
+            ephemeral=True
+        )
+
+        session_token = generate_session_token()
+
+        await self.bot.db.execute("""
+
+        INSERT INTO life_sessions (
+            session_token,
+            user_id,
+            guild_id
+        )
+
+        VALUES ($1, $2, $3)
+
+        """,
+
+            session_token,
+            str(interaction.user.id),
+            str(interaction.guild.id)
+
+        )
+
+        url = (
+            f"{LIFE_BASE_URL}"
+            f"/life/{self.room_id}"
+            f"?session={session_token}"
+        )
+
+        await interaction.followup.send(
+            f"🎲 人生ゲームはこちら\n{url}",
+            ephemeral=True
         )
 
 
@@ -223,9 +268,7 @@ async def create_panel(
 
     )
 
-    site_url = (
-        f"https://jinseigame-production.up.railway.app/life/{room_id}"
-    )
+
 
     embed = discord.Embed(
         title="🎲 人生ゲーム",
@@ -245,7 +288,7 @@ async def create_panel(
         inline=False
     )
 
-    view = LifeLinkView(site_url)
+    view = LifeLinkView(bot, room_id)
 
     await interaction.response.send_message(
         embed=embed,
