@@ -44,6 +44,15 @@ class Database:
             created_at TIMESTAMP DEFAULT NOW()
         )
         """)
+        await bot.db.execute("""
+        INSERT INTO life_panels (
+            room_id
+        )
+        VALUES ($1)
+        ON CONFLICT DO NOTHING
+        """,
+            room_id
+        )
         
         await self.execute("""
         CREATE TABLE IF NOT EXISTS life_user_progress (
