@@ -254,6 +254,12 @@ async def roll_dice(
         }
 
     current_position = progress["position"]
+    current_dice = progress["dice_count"]
+    if current_dice <= 0:
+
+        return {
+            "error": "no dice"
+        }
 
     dice = random.randint(1, 6)
 
@@ -268,6 +274,7 @@ async def roll_dice(
 
     SET
         position = $1,
+        dice_count = dice_count - 1,
         updated_at = NOW()
 
     WHERE user_id = $2
