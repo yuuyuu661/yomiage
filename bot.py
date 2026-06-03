@@ -82,6 +82,79 @@ def generate_session_token():
 
     return secrets.token_urlsafe(32)
 
+def generate_board_tiles():
+
+    prizes = [
+        "思い出photo or イタズラ落書き 半額",
+        "ボトルⓜⓔⓝⓤ無料",
+        "特別席無料",
+        "指名料無料"
+    ]
+
+    menus = [
+        "語尾もふもふ",
+        "叱咤激励",
+        "セリフ読み",
+        "甘えん坊〇〇",
+        "ぷんぷん〇〇",
+        "〇〇からの告白"
+    ]
+
+    bads = [
+        "1マス進む",
+        "2マス戻る",
+        "🎲1回休み",
+        "大好き〜と叫ぶ"
+    ]
+
+    tiles = []
+
+    tiles.append({
+        "type": "start",
+        "text": "スタート"
+    })
+
+    import random
+
+    for i in range(98):
+
+        r = random.randint(1, 4)
+
+        if r == 1:
+
+            tiles.append({
+                "type": "menu",
+                "text": random.choice(menus)
+            })
+
+        elif r == 2:
+
+            tiles.append({
+                "type": "prize",
+                "text": random.choice(prizes)
+            })
+
+        elif r == 3:
+
+            tiles.append({
+                "type": "bad",
+                "text": random.choice(bads)
+            })
+
+        else:
+
+            tiles.append({
+                "type": "empty",
+                "text": "何もなし"
+            })
+
+    tiles.append({
+        "type": "goal",
+        "text": "ゴール"
+    })
+
+    return tiles
+
 class LifeLinkView(View):
 
     def __init__(self, bot, room_id):
@@ -247,6 +320,23 @@ async def create_panel(
         return
 
     room_id = generate_room_id()
+    tiles = generate_board_tiles()
+
+    for i, tile in enumerate(tiles):
+        await bot.db.execute("""
+        INSERT INTO life_tiles (
+            room_id,
+            tile_index,
+            tile_type,
+            tile_text
+        )
+        VALUES ($1, $2, $3, $4)
+        """,
+            room_id,
+            i,
+            tile["type"],
+            tile["text"]
+        )
 
     await bot.db.execute("""
 
