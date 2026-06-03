@@ -4,6 +4,7 @@ import discord
 import uvicorn
 import secrets
 
+
 from discord.ext import commands
 from discord import app_commands
 
@@ -13,6 +14,7 @@ from db import Database
 from api import app
 
 from zoneinfo import ZoneInfo
+from discord.ui import View, Button
 
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -74,6 +76,21 @@ bot = LifeBot()
 def generate_room_id():
 
     return secrets.token_hex(3).upper()
+
+class LifeLinkView(View):
+
+    def __init__(self, url):
+
+        super().__init__(timeout=None)
+
+        self.add_item(
+
+            Button(
+                label="🎲 人生ゲームサイト",
+                url=url
+            )
+
+        )
 
 
 def has_admin_role(member):
@@ -203,11 +220,25 @@ async def create_panel(
     site_url = (
         f"https://YOUR_SITE_URL/life/{room_id}"
     )
+    embed = discord.Embed(
+        title="🎲 人生ゲーム",
+        description=description,
+        color=0xffd54f
+    )
+    embed.add_field(
+        name="タイトル",
+        value=title,
+        inline=False
+    )
+    embed.add_field(
+        name="ROOM ID",
+        value=room_id,
+        inline=False
+    )
+    view = LifeLinkView(site_url)
     await interaction.response.send_message(
-        f"🎲 人生ゲームパネル生成完了\n\n"
-        f"タイトル: {title}\n"
-        f"ROOM ID: {room_id}\n\n"
-        f"{site_url}"
+        embed=embed,
+        view=view
     )
 
 
