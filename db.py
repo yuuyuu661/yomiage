@@ -76,4 +76,17 @@ class Database:
             created_at TIMESTAMP DEFAULT NOW()
         )
         """)
+        # =========================
+        # 人生ゲーム session
+        # =========================
+
+        await self._execute("""
+        CREATE TABLE IF NOT EXISTS life_sessions (
+            id SERIAL PRIMARY KEY,
+            session_token TEXT UNIQUE NOT NULL,
+            user_id TEXT NOT NULL,
+            guild_id TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """)
 
