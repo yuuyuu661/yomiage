@@ -304,6 +304,15 @@ async def roll_dice(
 
         "dice": dice,
         "position": new_position,
-        "tile": dict(tile)
+        "tile": dict(tile),
+        "dice_count": current_dice - 1
 
     }
+
+
+
+
+
+
+
+
