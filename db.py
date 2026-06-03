@@ -49,6 +49,10 @@ class Database:
             room_id TEXT PRIMARY KEY
         )
         """)
+        await self.execute("""
+        ALTER TABLE life_panels
+        ADD COLUMN IF NOT EXISTS room_id TEXT
+        """)
         
         await self.execute("""
         CREATE TABLE IF NOT EXISTS life_user_progress (
@@ -61,14 +65,6 @@ class Database:
         )
         """)
 
-        await self.execute("""
-        CREATE TABLE IF NOT EXISTS life_panels (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT NOW()
-        )
-        """)
 
         await self.execute("""
         CREATE TABLE IF NOT EXISTS life_history (
