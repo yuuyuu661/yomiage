@@ -189,13 +189,23 @@ class LifeLinkView(View):
 
         super().__init__(timeout=None)
 
+        button = Button(
+            label="🎲 人生ゲームサイト",
+            style=discord.ButtonStyle.green,
+            custom_id=f"life:open:{room_id}"
+        )
+
+        button.callback = self.open_life
+
+        self.add_item(button)
+
         self.bot = bot
         self.room_id = room_id
 
     @discord.ui.button(
         label="🎲 人生ゲームサイト",
         style=discord.ButtonStyle.green,
-        custom_id="life:open"
+        custom_id=f"life:open:{room_id}"
     )
     async def open_life(
         self,
