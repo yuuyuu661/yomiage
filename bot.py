@@ -51,8 +51,10 @@ class LifeBot(commands.Bot):
         print("DB初期化")
         await self.db.init_db()
 
-        print("スラッシュ同期")
-        await self.tree.sync()
+        # =========================
+        # 人生パネル復元
+        # =========================
+
         print("人生パネル復元")
 
         rows = await self.db.fetch("""
@@ -72,8 +74,16 @@ class LifeBot(commands.Bot):
             )
 
             print(
-                f"復元: {row['room_id']}"
+               f"復元: {row['room_id']}"
             )
+
+        # =========================
+        # スラッシュ同期
+        # =========================
+
+        print("スラッシュ同期")
+
+        await self.tree.sync()
 
         asyncio.create_task(
             self.start_api()
