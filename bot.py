@@ -224,7 +224,7 @@ async def create_panel(
     )
 
     site_url = (
-        f"https://YOUR_SITE_URL/life/{room_id}"
+        f"https://jinseigame-production.up.railway.app/life/{room_id}"
     )
 
     embed = discord.Embed(
