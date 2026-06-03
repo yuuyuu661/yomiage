@@ -257,7 +257,7 @@ async def add_dice(
 
     await bot.db.execute("""
 
-    INSERT INTO life_users (
+    INSERT INTO life_user_progress (
         user_id,
         dice_count
     )
