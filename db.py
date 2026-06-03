@@ -79,7 +79,6 @@ class Database:
         # =========================
         # 人生ゲーム session
         # =========================
-
         await self.execute("""
         CREATE TABLE IF NOT EXISTS life_sessions (
             id SERIAL PRIMARY KEY,
@@ -88,7 +87,11 @@ class Database:
             guild_id TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
+        """)
 
+        # =========================
+        # 人生ゲームマス
+        # =========================
         await self.execute("""
         CREATE TABLE IF NOT EXISTS life_tiles (
             id SERIAL PRIMARY KEY,
