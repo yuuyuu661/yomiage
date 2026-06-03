@@ -1,9 +1,25 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from db import Database
 
 app = FastAPI()
+app.add_middleware(
+
+    CORSMiddleware,
+
+    allow_origins=[
+        "https://jinseigame-production.up.railway.app"
+    ],
+
+    allow_credentials=True,
+
+    allow_methods=["*"],
+
+    allow_headers=["*"]
+
+)
 
 db = Database()
 
