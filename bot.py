@@ -21,7 +21,8 @@ JST = ZoneInfo("Asia/Tokyo")
 load_dotenv()
 
 ADMIN_ROLE_IDS = [
-    1310906528517062770
+    1310906528517062770,
+    1477647786135650387,
 ]
 LIFE_BASE_URL = "https://jinseigame-production.up.railway.app"
 API_BASE_URL = "https://yomiage-production.up.railway.app"
