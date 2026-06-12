@@ -403,19 +403,27 @@ async def create_panel(
         return
 
     # =========================
-    # 前回の人生ゲームをリセット
+    # 前回データ削除
     # =========================
 
     await bot.db.execute("""
-
     DELETE FROM life_history
-
     """)
 
     await bot.db.execute("""
-
     DELETE FROM life_user_progress
+    """)
 
+    await bot.db.execute("""
+    DELETE FROM life_tiles
+    """)
+
+    await bot.db.execute("""
+    DELETE FROM life_rooms
+    """)
+
+    await bot.db.execute("""
+    DELETE FROM life_panels
     """)
 
     room_id = generate_room_id()
