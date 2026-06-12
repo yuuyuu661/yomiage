@@ -552,7 +552,9 @@ async def history(
 
     progress = await bot.db.fetchrow("""
 
-    SELECT dice_count
+    SELECT
+        dice_count,
+        position
     FROM life_user_progress
     WHERE user_id = $1
     AND room_id = $2
@@ -564,9 +566,14 @@ async def history(
     )
 
     dice_count = 0
+    position = 0
 
     if progress:
+
         dice_count = progress["dice_count"]
+        position = progress["position"]
+
+    remain = 99 - position
 
     rows = await bot.db.fetch("""
 
@@ -584,8 +591,9 @@ async def history(
     )
 
     text = (
-        f"🎲現在のサイコロ所持数: "
-        f"{dice_count}\n\n"
+        f"🎲現在のサイコロ所持数: {dice_count}\n"
+        f"📍現在: {position}マス\n"
+        f"🏁ゴールまであと: {remain}マス\n\n"
     )
 
     if not rows:
