@@ -275,19 +275,16 @@ async def on_ready():
 
 
 # =========================
-# サイコロ付与
+# 人生ゲームサイコロ付与
 # =========================
 
 @bot.tree.command(
-    name="サイコロ付与",
-    description="サイコロを付与"
+    name="人生ゲームサイコロ付与",
+    description="最新の人生ゲームにサイコロを1個付与"
 )
-async def add_dice(
+async def add_life_dice(
     interaction: discord.Interaction,
-    room_id: str,
-    user: discord.Member,
-    amount: int,
-    memo: str = None
+    user: discord.Member
 ):
 
     if not has_admin_role(interaction.user):
@@ -298,62 +295,88 @@ async def add_dice(
         )
         return
 
+    latest_room = await bot.db.fetchrow("""
+
+    SELECT room_id
+    FROM life_rooms
+    ORDER BY created_at DESC
+    LIMIT 1
+
+    """)
+
+    if not latest_room:
+
+        await interaction.response.send_message(
+            "人生ゲームのパネルがまだ生成されていません。",
+            ephemeral=True
+        )
+        return
+
+    room_id = latest_room["room_id"]
+
+    progress = await bot.db.fetchrow("""
+
+    SELECT dice_count
+    FROM life_user_progress
+    WHERE user_id = $1
+    AND room_id = $2
+
+    """,
+        str(user.id),
+        room_id
+    )
+
+    if progress and progress["dice_count"] >= 1:
+
+        await interaction.response.send_message(
+            f"{user.mention} はサイコロをすでに1個持ってます。"
+        )
+        return
+
     await bot.db.execute("""
 
     INSERT INTO life_user_progress (
-
         user_id,
         room_id,
         dice_count,
         position
-
     )
 
-    VALUES ($1, $2, $3, $4)
+    VALUES ($1, $2, 1, 0)
 
     ON CONFLICT (user_id, room_id)
 
     DO UPDATE SET
-
-    dice_count =
-    life_user_progress.dice_count + $3
+        dice_count = 1,
+        updated_at = NOW()
 
     """,
-
         str(user.id),
-        room_id,
-        amount,
-        0
+        room_id
     )
 
     await bot.db.execute("""
 
     INSERT INTO life_history (
-
         user_id,
         room_id,
         action_type,
         message,
         memo
-
     )
 
     VALUES ($1, $2, $3, $4, $5)
 
     """,
-
         str(user.id),
         room_id,
         "dice_add",
-        f"サイコロ {amount}個付与",
-        memo
+        "サイコロ 1個付与",
+        None
     )
 
     await interaction.response.send_message(
-
-        f"{user.mention} に "
-        f"サイコロ {amount}個付与しました"
-
+        f"{user.mention} にサイコロを1個付与しました。"
     )
 
 
