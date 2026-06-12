@@ -300,6 +300,28 @@ async def roll_dice(
         new_position
     )
 
+    await db.execute("""
+
+    INSERT INTO life_history (
+
+        user_id,
+        room_id,
+        action_type,
+        message
+
+    )
+
+    VALUES ($1, $2, $3, $4)
+
+    """,
+
+        user_id,
+        room_id,
+        "roll",
+        f"出目:{dice} / 停止マス:{tile['tile_text']}"
+
+    )
+
     return {
 
         "dice": dice,
