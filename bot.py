@@ -532,27 +532,70 @@ async def history(
         )
         return
 
+    latest_room = await bot.db.fetchrow("""
+
+    SELECT room_id
+    FROM life_rooms
+    ORDER BY created_at DESC
+    LIMIT 1
+
+    """)
+
+    if not latest_room:
+
+        await interaction.response.send_message(
+            "人生ゲームが開始されていません。"
+        )
+        return
+
+    room_id = latest_room["room_id"]
+
+    progress = await bot.db.fetchrow("""
+
+    SELECT dice_count
+    FROM life_user_progress
+    WHERE user_id = $1
+    AND room_id = $2
+
+    """,
+
+        str(user.id),
+        room_id
+    )
+
+    dice_count = 0
+
+    if progress:
+        dice_count = progress["dice_count"]
+
     rows = await bot.db.fetch("""
 
     SELECT *
     FROM life_history
     WHERE user_id = $1
+    AND room_id = $2
     ORDER BY created_at DESC
     LIMIT 10
 
     """,
 
-        str(user.id)
+        str(user.id),
+        room_id
+    )
+
+    text = (
+        f"🎲現在のサイコロ所持数: "
+        f"{dice_count}\n\n"
     )
 
     if not rows:
 
+        text += "履歴なし"
+
         await interaction.response.send_message(
-            "履歴なし"
+            text
         )
         return
-
-    text = ""
 
     for row in rows:
 
@@ -568,11 +611,15 @@ async def history(
         )
 
         if row["memo"]:
-            text += f"メモ: {row['memo']}\n"
+            text += (
+                f"メモ: {row['memo']}\n"
+            )
 
         text += "\n"
 
-    await interaction.response.send_message(text)
+    await interaction.response.send_message(
+        text
+    )
 
 
 bot.run(
