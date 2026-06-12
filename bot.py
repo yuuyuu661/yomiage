@@ -258,7 +258,124 @@ class LifeLinkView(View):
             f"🎲 人生ゲームはこちら\n{url}",
             ephemeral=True
         )
+class LifeHistoryView(discord.ui.View):
 
+    def __init__(
+        self,
+        user,
+        dice_count,
+        position,
+        rows
+    ):
+
+        super().__init__(timeout=300)
+
+        self.user = user
+        self.dice_count = dice_count
+        self.position = position
+        self.rows = rows
+
+        self.page = 0
+        self.per_page = 5
+
+    def build_embed(self):
+
+        remain = 99 - self.position
+
+        embed = discord.Embed(
+            title=f"🎲 {self.user.display_name} の人生ゲーム履歴",
+            color=0xffd54f
+        )
+
+        embed.description = (
+            f"🎲現在のサイコロ所持数: "
+            f"{self.dice_count}\n"
+            f"📍現在: {self.position}マス\n"
+            f"🏁ゴールまであと: {remain}マス"
+        )
+
+        start = self.page * self.per_page
+        end = start + self.per_page
+
+        page_rows = self.rows[start:end]
+
+        history_text = ""
+
+        for row in page_rows:
+
+            jst_time = row["created_at"].astimezone(JST)
+
+            time_str = jst_time.strftime(
+                "%m/%d %H:%M"
+            )
+
+            history_text += (
+                f"🕒 {time_str}\n"
+                f"{row['message']}\n"
+                "────────────\n"
+            )
+
+        if not history_text:
+
+            history_text = "履歴なし"
+
+        embed.add_field(
+            name="履歴",
+            value=history_text,
+            inline=False
+        )
+
+        max_page = max(
+            1,
+            (len(self.rows) - 1)
+            // self.per_page + 1
+        )
+
+        embed.set_footer(
+            text=f"{self.page + 1}/{max_page} ページ"
+        )
+
+        return embed
+
+    @discord.ui.button(
+        label="◀ 前へ",
+        style=discord.ButtonStyle.gray
+    )
+    async def prev_page(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        if self.page > 0:
+            self.page -= 1
+
+        await interaction.response.edit_message(
+            embed=self.build_embed(),
+            view=self
+        )
+
+    @discord.ui.button(
+        label="▶ 次へ",
+        style=discord.ButtonStyle.green
+    )
+    async def next_page(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        max_page = (
+            len(self.rows) - 1
+        ) // self.per_page
+
+        if self.page < max_page:
+            self.page += 1
+
+        await interaction.response.edit_message(
+            embed=self.build_embed(),
+            view=self
+        )
 
 def has_admin_role(member):
 
