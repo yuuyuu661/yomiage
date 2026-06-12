@@ -342,12 +342,12 @@ async def add_life_dice(
         position
     )
 
-    VALUES ($1, $2, 1, 0)
+    VALUES ($1, $2, 2, 0)
 
     ON CONFLICT (user_id, room_id)
 
     DO UPDATE SET
-        dice_count = 1,
+        dice_count = 2,
         updated_at = NOW()
 
     """,
@@ -371,12 +371,12 @@ async def add_life_dice(
         str(user.id),
         room_id,
         "dice_add",
-        "サイコロ 1個付与",
+        "サイコロ 2個付与",
         None
     )
 
     await interaction.response.send_message(
-        f"{user.mention} にサイコロを1個付与しました。"
+        f"{user.mention} にサイコロを2個付与しました。"
     )
 
 
