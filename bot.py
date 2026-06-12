@@ -614,7 +614,7 @@ async def history(
         )
 
         text += (
-            f"{time_str}\n"
+            f"🕒 {time_str}\n"
             f"{row['message']}\n"
         )
 
@@ -623,10 +623,16 @@ async def history(
                 f"メモ: {row['memo']}\n"
             )
 
-        text += "\n"
+        text += "────────────\n"
+
+    embed = discord.Embed(
+        title=f"🎲 {user.display_name} の人生ゲーム履歴",
+        description=text,
+        color=0xffd54f
+    )
 
     await interaction.response.send_message(
-        text
+        embed=embed
     )
 
 
