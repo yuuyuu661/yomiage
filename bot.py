@@ -742,14 +742,17 @@ async def history(
 
         text += "────────────\n"
 
-    embed = discord.Embed(
-        title=f"🎲 {user.display_name} の人生ゲーム履歴",
-        description=text,
-        color=0xffd54f
+    view = LifeHistoryView(
+        user,
+        dice_count,
+        position,
+        rows
     )
 
     await interaction.response.send_message(
-        embed=embed
+        embed=view.build_embed(),
+        view=view,
+        ephemeral=True
     )
 
 
