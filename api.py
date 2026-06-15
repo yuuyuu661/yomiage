@@ -255,6 +255,7 @@ async def roll_dice(
 
     current_position = progress["position"]
     current_dice = progress["dice_count"]
+
     if current_dice <= 0:
 
         return {
@@ -268,7 +269,9 @@ async def roll_dice(
         99
     )
 
-
+    # =========================
+    # 止まったマス取得
+    # =========================
 
     tile = await db.fetchrow("""
 
@@ -282,6 +285,7 @@ async def roll_dice(
         room_id,
         new_position
     )
+
     original_tile = tile
 
     # =========================
@@ -328,36 +332,74 @@ async def roll_dice(
             new_position
         )
 
-        await db.execute("""
+    # =========================
+    # 位置保存
+    # =========================
 
-        INSERT INTO life_history (
+    await db.execute("""
 
-            user_id,
-            room_id,
-            action_type,
-            message
+    UPDATE life_user_progress
 
+    SET
+        position = $1,
+        dice_count = dice_count - 1,
+        updated_at = NOW()
+
+    WHERE user_id = $2
+    AND room_id = $3
+
+    """,
+
+        new_position,
+        user_id,
+        room_id
+    )
+
+    # =========================
+    # 履歴
+    # =========================
+
+    message = (
+        f"出目:{dice} / "
+        f"停止マス:{original_tile['tile_text']}"
+    )
+
+    if original_tile["tile_text"] != tile["tile_text"]:
+
+        message += (
+            f" → {tile['tile_text']}"
         )
 
-        VALUES ($1, $2, $3, $4)
+    await db.execute("""
 
-        """,
+    INSERT INTO life_history (
 
-            user_id,
-            room_id,
-            "roll",
-            f"出目:{dice} / 停止マス:{tile['tile_text']}"
+        user_id,
+        room_id,
+        action_type,
+        message
 
-        )
+    )
 
-        return {
+    VALUES ($1, $2, $3, $4)
 
-            "dice": dice,
-            "position": new_position,
-            "tile": dict(tile),
-            "dice_count": current_dice - 1
+    """,
 
-        }
+        user_id,
+        room_id,
+        "roll",
+        message
+    )
+
+    return {
+
+        "dice": dice,
+        "position": new_position,
+        "tile": dict(tile),
+        "trigger_tile": dict(original_tile),
+        "dice_count": current_dice - 1
+
+    }
 
 
 
