@@ -22,7 +22,19 @@ load_dotenv()
 
 ADMIN_ROLE_IDS = [
     1310906528517062770,
-    1477647786135650387,
+    1337336175332954153,
+    1330887476818219020,
+    1330887320144056361,
+    1330881567509188608,
+    1337336630280851456,
+    1361322037917913119,
+
+
+
+
+
+
+    
 ]
 LIFE_BASE_URL = "https://jinseigame-production.up.railway.app"
 API_BASE_URL = "https://yomiage-production.up.railway.app"
