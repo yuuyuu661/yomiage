@@ -146,7 +146,6 @@ def generate_board_tiles():
     bads = [
         "1マス進む",
         "2マス戻る",
-        "🎲1回休み",
         "語尾にゃんでお話する",
         "ドリンクを1つ頼む",
         "大好き〜と叫ぶ",
@@ -601,15 +600,9 @@ async def create_panel(
 
 
     embed = discord.Embed(
-        title="🎲 人生ゲーム",
+        title=f"🎲 {title}",
         description=description,
         color=0xffd54f
-    )
-
-    embed.add_field(
-        name="タイトル",
-        value=title,
-        inline=False
     )
 
     embed.add_field(
