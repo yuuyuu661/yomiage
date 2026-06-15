@@ -268,24 +268,7 @@ async def roll_dice(
         99
     )
 
-    await db.execute("""
 
-    UPDATE life_user_progress
-
-    SET
-        position = $1,
-        dice_count = dice_count - 1,
-        updated_at = NOW()
-
-    WHERE user_id = $2
-    AND room_id = $3
-
-    """,
-
-        new_position,
-        user_id,
-        room_id
-    )
 
     tile = await db.fetchrow("""
 
@@ -299,37 +282,82 @@ async def roll_dice(
         room_id,
         new_position
     )
+    original_tile = tile
 
-    await db.execute("""
+    # =========================
+    # 特殊マス処理
+    # =========================
 
-    INSERT INTO life_history (
+    if tile["tile_text"] == "1マス進む":
 
-        user_id,
-        room_id,
-        action_type,
-        message
+        new_position = min(
+            new_position + 1,
+            99
+        )
 
-    )
+        tile = await db.fetchrow("""
 
-    VALUES ($1, $2, $3, $4)
+        SELECT *
+        FROM life_tiles
+        WHERE room_id = $1
+        AND tile_index = $2
 
-    """,
+        """,
 
-        user_id,
-        room_id,
-        "roll",
-        f"出目:{dice} / 停止マス:{tile['tile_text']}"
+            room_id,
+            new_position
+        )
 
-    )
+    elif tile["tile_text"] == "2マス戻る":
 
-    return {
+        new_position = max(
+            new_position - 2,
+            0
+        )
 
-        "dice": dice,
-        "position": new_position,
-        "tile": dict(tile),
-        "dice_count": current_dice - 1
+        tile = await db.fetchrow("""
 
-    }
+        SELECT *
+        FROM life_tiles
+        WHERE room_id = $1
+        AND tile_index = $2
+
+        """,
+
+            room_id,
+            new_position
+        )
+
+        await db.execute("""
+
+        INSERT INTO life_history (
+
+            user_id,
+            room_id,
+            action_type,
+            message
+
+        )
+
+        VALUES ($1, $2, $3, $4)
+
+        """,
+
+            user_id,
+            room_id,
+            "roll",
+            f"出目:{dice} / 停止マス:{tile['tile_text']}"
+
+        )
+
+        return {
+
+            "dice": dice,
+            "position": new_position,
+            "tile": dict(tile),
+            "dice_count": current_dice - 1
+
+        }
 
 
 
