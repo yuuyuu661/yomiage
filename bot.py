@@ -446,7 +446,7 @@ async def add_life_dice(
     if progress and progress["dice_count"] >= 1:
 
         await interaction.response.send_message(
-            f"{user.mention} はサイコロをすでに1個持ってます。"
+            f"{user.mention} はサイコロをすでに持ってます。"
         )
         return
 
